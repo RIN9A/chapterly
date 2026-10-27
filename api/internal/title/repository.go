@@ -25,7 +25,7 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 func scanTitle(row interface {
-	Scan(dest ...any) error 
+	Scan(dest ...any) error
 }) (Title, error) {
 	var t Title
 	var genresJSON string
@@ -76,19 +76,19 @@ func scanTitle(row interface {
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (Title, error) {
 	now := time.Now().UTC()
-	t := Title {
-		ID: uuid.NewString(),
-		Title: input.Title,
-		Author: input.Author,
-		CoverURL: input.CoverURL,
-		SourceURL: input.SourceURL,
-		Status: input.Status,
+	t := Title{
+		ID:             uuid.NewString(),
+		Title:          input.Title,
+		Author:         input.Author,
+		CoverURL:       input.CoverURL,
+		SourceURL:      input.SourceURL,
+		Status:         input.Status,
 		CurrentChapter: input.CurrentChapter,
-		TotalChapters: input.TotalChapters,
-		Genres: input.Genres,
-		Note: input.Note,
-		CreatedAt: now,
-		UpdatedAt: now,
+		TotalChapters:  input.TotalChapters,
+		Genres:         input.Genres,
+		Note:           input.Note,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	if t.Status == "" {
@@ -106,7 +106,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (Title, erro
 	if err != nil {
 		return Title{}, fmt.Errorf("insert title: %w", err)
 	}
-		
+
 	log.Println(t.ID)
 
 	return t, nil
@@ -132,8 +132,6 @@ func (r *Repository) List(ctx context.Context) ([]Title, error) {
 		}
 		titles = append(titles, t)
 	}
-	log.Println("dkldkldkl")
-	log.Println(titles)
 	return titles, nil
 }
 
@@ -142,14 +140,82 @@ func (r *Repository) GetByID(ctx context.Context, id string) (Title, error) {
 	SELECT id, title, author, cover_url, source_url, status, current_chapter, total_chapters, genres,
 	 note, created_at, updated_at FROM titles WHERE id = ?`, id)
 
-	 t, err := scanTitle(row)
+	t, err := scanTitle(row)
 
-	 if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return Title{}, ErrNotFound
-	 }
+	}
 
-	 if err != nil {
+	if err != nil {
 		return Title{}, fmt.Errorf("scan title: %w", err)
-	 }
+	}
 	return t, nil
+}
+
+func (r *Repository) Update(ctx context.Context, id string, input UpdateInput) (Title, error) {
+	current, err := r.GetByID(ctx, id)
+
+	if err != nil {
+		return Title{}, err
+	}
+
+	if input.Title != nil {
+		current.Title = *input.Title
+	}
+	if input.Author != nil {
+		current.Author = *input.Author
+	}
+	if input.CoverURL != nil {
+		current.CoverURL = *input.CoverURL
+	}
+	if input.SourceURL != nil {
+		current.SourceURL = *input.SourceURL
+	}
+	if input.Status != nil {
+		current.Status = *input.Status
+	}
+
+	if input.CurrentChapter != nil {
+		current.CurrentChapter = *input.CurrentChapter
+	}
+
+	if input.TotalChapters != nil {
+		current.TotalChapters = input.TotalChapters
+	}
+
+	if input.Genres != nil {
+		current.Genres = input.Genres
+	}
+	if input.Note != nil {
+		current.Note = *input.Note
+	}
+	current.UpdatedAt = time.Now().UTC()
+
+	genresJSON, err := json.Marshal(current.Genres)
+	if err != nil {
+		return Title{}, fmt.Errorf("marshal genres: %w", err)
+	}
+	result, err := r.db.ExecContext(ctx, `
+	UPDATE titles
+	SET title = ?, author = ?, cover_url = ?, source_url = ?,
+	status = ?, current_chapter = ?, total_chapters = ?, genres = ?, note = ?,
+	updated_at = ? WHERE id = ?`,
+		current.Title, current.Author, current.CoverURL, current.SourceURL,
+		current.Status, current.CurrentChapter, current.TotalChapters, string(genresJSON), current.Note,
+		current.UpdatedAt.Format(time.RFC3339),
+		id,
+	)
+	if err != nil {
+		return Title{}, fmt.Errorf("update title: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return Title{}, fmt.Errorf("check updated rows: %w", err)
+	}
+	if rowsAffected == 0 {
+		return Title{}, ErrNotFound
+	}
+
+	return current, nil
 }

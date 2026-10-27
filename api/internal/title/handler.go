@@ -17,14 +17,14 @@ func NewHandler(repo *Repository) *Handler {
 	return &Handler{repo: repo}
 }
 
-func writeJSON(w http.ResponseWriter,status int, value any) {
+func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
 	if err := json.NewEncoder(w).Encode(value); err != nil {
 		http.Error(w, `{"error": "Failed to encode response"}`,
-	http.StatusInternalServerError,
-)
+			http.StatusInternalServerError,
+		)
 	}
 }
 
@@ -44,7 +44,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(input.Title) > 300 { 
+	if len(input.Title) > 300 {
 		writeError(w, http.StatusBadRequest, "Name is too long")
 		return
 	}
@@ -78,10 +78,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, created)
 }
 
-func (h *Handler) List(w http.ResponseWriter, r *http.Request){
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	titles, err := h.repo.List(r.Context())
 	if err != nil {
-			
+
 		log.Printf("list titles error: %v", err)
 
 		writeError(w, http.StatusInternalServerError, "Failed to get list of titles")
@@ -105,4 +105,52 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, found)
 }
 
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
 
+	var input UpdateInput
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if input.Title != nil && strings.TrimSpace(*input.Title) == "" {
+		writeError(w, http.StatusBadRequest, "Title cannot be empty")
+		return
+	}
+
+	if input.Status != nil {
+		switch *input.Status {
+		case StatusWantToRead, StatusReading, StatusPaused, StatusFinished, StatusDropped:
+		default:
+			writeError(w, http.StatusBadRequest, "Unknown reading status")
+			return
+		}
+	}
+
+	if input.CurrentChapter != nil && *input.CurrentChapter < 0 {
+		writeError(w, http.StatusBadRequest, "Current chapter cannot be negative")
+		return
+	}
+
+	if input.TotalChapters != nil && *input.TotalChapters < 0 {
+		writeError(w, http.StatusBadRequest, "Total chapters cannot be negative")
+		return
+	}
+
+	updated, err := h.repo.Update(r.Context(), id, input)
+
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Title not found")
+		return
+	}
+
+	if err != nil {
+		log.Printf("update title error: %v", err)
+		writeError(w, http.StatusInternalServerError, "Failed to update title")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, updated)
+}
