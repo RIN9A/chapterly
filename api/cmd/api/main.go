@@ -39,6 +39,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/titles", titleHandler.Create)
 	mux.HandleFunc("GET /api/v1/titles/{id}", titleHandler.GetByID)
 	mux.HandleFunc("PATCH /api/v1/titles/{id}", titleHandler.Update)	
+	mux.HandleFunc("DELETE /api/v1/titles/{id}", titleHandler.Delete)
 
 
 	server := &http.Server{

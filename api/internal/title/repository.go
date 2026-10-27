@@ -219,3 +219,21 @@ func (r *Repository) Update(ctx context.Context, id string, input UpdateInput) (
 
 	return current, nil
 }
+
+func (r *Repository) Delete(ctx context.Context, id string) error {
+	result, err := r.db.ExecContext(ctx, `
+	DELETE FROM titles WHERE id = ?
+	`, id)
+	if err != nil {
+		return fmt.Errorf("delete title: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("check deleted rows: %w", err)
+	}
+		if rows == 0 {
+			return ErrNotFound
+		}
+		return nil
+}

@@ -154,3 +154,20 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, updated)
 }
+
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	err := h.repo.Delete(r.Context(), id)
+
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Title not found")
+		return
+	}
+	if err != nil {
+		log.Printf("delete title error: %v", err)
+		writeError(w, http.StatusInternalServerError, "Failed to delete title")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
